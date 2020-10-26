@@ -8,7 +8,7 @@
 #include <dlib/image_processing/render_face_detections.h>
 #include <dlib/image_processing.h>
 #include <dlib/serialize.h>
-
+#include <vector>
 #include <Windows.h>
 #include "CameraDetector.h"
 
@@ -126,6 +126,28 @@ int main(void) {
 	// 画面出力
 	std::ostringstream outtext;
 
+	// Live2Dに必要なパラメタの抽出をここで
+	// 角度X : ParamAngleX
+	// 角度Y : ParamAngleY
+	// 角度Z : ParamAngleZ
+	// 左目開閉 : ParamEyeLOpen
+	// 右目開閉 : ParamEyeROpen
+	// 目玉X : ParamEyeBallX
+	// 目玉Y : ParamEyeBallY
+	std::vector<std::string> ParamIDs{
+		"ParamAngleX",
+		"ParamAngleY",
+		"ParamAngleZ",
+		"ParamEyeLOpen",
+		"ParamEyeROpen",
+		"ParamEyeBallX",
+		"ParamEyeBallY"
+	};
+
+	// pairを要素に持つvectorにパラメータを格納する
+	// pairの構成は < ParamID , Value >
+	std::vector< std::pair<const char*, double> > Live2D_Param;
+
 	// メイン処理
 	while (TRUE) {
 
@@ -211,11 +233,11 @@ int main(void) {
 
 			// フィルタ処理で姿勢変化を滑らかに
 			// 変動にしきい値を設定 & Smoothing
-			// 顔の角度制限
+			// 顔の角度制限(Live2Dが30まで対応なのでそれに制限)
 			for (int i = 0; i < 3; i++)
 			{
-				if (euler_angle.at<double>(i) > 35) euler_angle.at<double>(i) = 35;
-				if (euler_angle.at<double>(i) < -35) euler_angle.at<double>(i) = -35;
+				if (euler_angle.at<double>(i) > 30) euler_angle.at<double>(i) = 30;
+				if (euler_angle.at<double>(i) < -30) euler_angle.at<double>(i) = -30;
 				if ((std::abs(prev_euler_angle.at<double>(i) - euler_angle.at<double>(i)) > 1))
 				{
 					if (prev_euler_angle.at<double>(i) > euler_angle.at<double>(i))
@@ -265,7 +287,11 @@ int main(void) {
 			actor.roll = euler_angle.at<double>(2);
 
 
-			// Live2Dに必要なパラメタの抽出をここで
+			// Live2D用パラメータに格納
+			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[0].c_str(), euler_angle.at<double>(0)));
+			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[1].c_str(), euler_angle.at<double>(1)));
+			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[2].c_str(), euler_angle.at<double>(2)));
+			// TODO : Eye関係paramの実装
 
 
 			image_pts.clear();
