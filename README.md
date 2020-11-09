@@ -1,4 +1,4 @@
-# DlibFaceTracker
+# Live2D_Facetracking
 ## require
 * Dlib 19.21
 * OpenCV 4.5.0
