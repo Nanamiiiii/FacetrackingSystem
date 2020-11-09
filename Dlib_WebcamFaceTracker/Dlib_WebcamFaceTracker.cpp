@@ -21,6 +21,7 @@
 #define MAX_FACE_ANGLE 35
 
 
+
 // カメラ用パラメータ
 double K[9] = { 6.5308391993466671e+002, 0.0, 3.1950000000000000e+002, 0.0, 6.5308391993466671e+002, 2.3950000000000000e+002, 0.0, 0.0, 1.0 };
 double D[5] = { 7.0834633684407095e-002, 6.9140193737175351e-002, 0.0, 0.0, -1.3073460323689292e+000 };
@@ -200,6 +201,20 @@ int main(void) {
 			image_pts.push_back(cv::Point2d(shape.part(57).x(), shape.part(57).y())); // #57 口中央下
 			image_pts.push_back(cv::Point2d(shape.part(8).x(), shape.part(8).y()));   // #8  顎
 
+			// 目関連のパラメータを別で格納
+			std::vector<cv::Point2d> eye_left;
+			std::vector<cv::Point2d> eye_right;
+
+			for (int i = 42; i < 48; i++) {
+				// 左目の各点座標 42~47
+				eye_left.push_back(cv::Point2d(shape.part(i).x(), shape.part(i).y()));
+			}
+
+			for (int i = 36; i < 42; i++) {
+				// 右目の各点座標 36~41
+				eye_right.push_back(cv::Point2d(shape.part(i).x(), shape.part(i).y()));
+			}
+
 			// 顔器官点の3D座標現在値と姿勢情報の算出
 			cv::solvePnP(object_pts, image_pts, cam_matrix, dist_coeffs, rotation_vec, translation_vec);
 
@@ -261,6 +276,23 @@ int main(void) {
 			prev_euler_angle.at<double>(1) = euler_angle.at<double>(1);
 			prev_euler_angle.at<double>(2) = euler_angle.at<double>(2);
 
+			// 目の開閉の判定処理
+			double ear_left = (calc_dst(eye_left[1], eye_left[5]) + calc_dst(eye_left[2], eye_left[4])) / (2.0 * calc_dst(eye_left[0], eye_left[3]));
+			double ear_right = (calc_dst(eye_right[1], eye_right[5]) + calc_dst(eye_right[2], eye_right[4])) / (2.0 * calc_dst(eye_right[0], eye_right[3]));
+			double close_val = 0.2; // 閉じている判定のしきい値
+			double open_val = 0.3; // 開きの最大判定値 (後々初期値設定側で導入)
+
+			// しきい値で値を0~1に収める
+			if (ear_left > open_val) ear_left = open_val;
+			if (ear_right > open_val) ear_right = open_val;
+			if (ear_left < close_val) ear_left = close_val;
+			if (ear_right < close_val) ear_right = close_val;
+			ear_left -= close_val;
+			ear_right -= close_val;
+
+			// TODO: 眼球座標の算出
+
+
 			// 画面表示：顔角度
 			outtext << "X: " << std::setprecision(3) << euler_angle.at<double>(0);
 			cv::putText(temp, outtext.str(), cv::Point(50, 40), cv::FONT_HERSHEY_SIMPLEX, 0.75, cv::Scalar(255, 255, 255));
@@ -287,11 +319,13 @@ int main(void) {
 			actor.roll = euler_angle.at<double>(2);
 
 
-			// Live2D用パラメータに格納
+			// Live2D用パラメータを作成
 			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[0].c_str(), euler_angle.at<double>(0)));
 			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[1].c_str(), euler_angle.at<double>(1)));
 			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[2].c_str(), euler_angle.at<double>(2)));
 			// TODO : Eye関係paramの実装
+			Live2D_Param.push_back(std::pair<const char*, double>(ParamIDs[3].c_str(), ear_left));
+			Live2D_Param.push_back(std::pair<const char*, double>(ParamIDs[4].c_str(), ear_right));
 
 
 			image_pts.clear();
@@ -360,4 +394,8 @@ void SetInitialPoints(std::vector<cv::Point3d>* in_BoxPoints, std::vector<cv::Po
 	object_pts.push_back(cv::Point3d(0.000000, -7.415691, 4.070434));    //#6 顎
 	*in_BoxPoints = reprojectsrc;
 	*in_FaceLandmarkPoints = object_pts;
+}
+
+double calc_dst(cv::Point2d a, cv::Point2d b) {
+	return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
 }
