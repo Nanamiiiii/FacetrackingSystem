@@ -38,6 +38,18 @@ public:
 	float eye_L_Y;
 };
 
+// 目領域
+typedef struct eye_region {
+	cv::Point2d top;
+	cv::Point2d bottom;
+}EYE_REGION;
+
+// 虹彩
+typedef struct iris {
+	cv::Point2d center;
+	double radius;
+}IRIS;
+
 // ローカル関数
 static void DrawFaceBox(cv::Mat frame, std::vector<cv::Point2d> reprojectdst); // 顔枠生成
 static void SetInitialPoints(std::vector<cv::Point3d>* in_BoxPoints, std::vector<cv::Point3d>* in_FaceLandmarkPoints); // 顔器官点の設定
@@ -291,6 +303,17 @@ int main(void) {
 			ear_right -= close_val;
 
 			// TODO: 眼球座標の算出
+			// 目領域の設定
+			EYE_REGION eye_left_region, eye_right_region;
+			eye_left_region.top = cv::Point2d(eye_left[0].x, eye_left[1].y < eye_left[2].y ? eye_left[2].y : eye_left[1].y);
+			eye_left_region.bottom = cv::Point2d(eye_left[3].x, eye_left[4].y < eye_left[5].y ? eye_left[5].y : eye_left[4].y);
+			eye_right_region.top = cv::Point2d(eye_right[0].x, eye_right[1].y < eye_right[2].y ? eye_right[2].y : eye_right[1].y);
+			eye_right_region.bottom = cv::Point2d(eye_right[3].x, eye_right[4].y < eye_right[5].y ? eye_right[5].y : eye_right[4].y);
+			// 目領域の切り出し
+			cv::Mat left_eye_img, right_eye_img;
+			left_eye_img = temp(cv::Rect(eye_left_region.top.x, eye_left_region.top.y, eye_left_region.bottom.x - eye_left_region.top.x, eye_left_region.bottom.y - eye_left_region.top.y));
+			right_eye_img = temp(cv::Rect(eye_right_region.top.x, eye_right_region.top.y, eye_right_region.bottom.x - eye_right_region.top.x, eye_right_region.bottom.y - eye_right_region.top.y));
+
 
 
 			// 画面表示：顔角度
@@ -398,4 +421,16 @@ void SetInitialPoints(std::vector<cv::Point3d>* in_BoxPoints, std::vector<cv::Po
 
 double calc_dst(cv::Point2d a, cv::Point2d b) {
 	return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+}
+
+/// <summary>
+/// 虹彩検出
+/// </summary>
+/// <param name="eye_img">cv::Mat 目の画像</param>
+/// <returns>struct IRIS 検出した虹彩</returns>
+IRIS detect_iris(cv::Mat eye_img) {
+	cv::Mat eye_img_gs; 
+	cv::cvtColor(eye_img, eye_img_gs, cv::COLOR_BGR2GRAY);
+	cv::Mat eye_img_gau;
+	cv::GaussianBlur(eye_img_gs, eye_img_gau, cv::Size(5, 5), 0);
 }
