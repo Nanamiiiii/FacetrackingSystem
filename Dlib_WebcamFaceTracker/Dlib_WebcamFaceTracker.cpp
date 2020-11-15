@@ -433,4 +433,41 @@ IRIS detect_iris(cv::Mat eye_img) {
 	cv::cvtColor(eye_img, eye_img_gs, cv::COLOR_BGR2GRAY);
 	cv::Mat eye_img_gau;
 	cv::GaussianBlur(eye_img_gs, eye_img_gau, cv::Size(5, 5), 0);
+	
+	// Pタイル法での二値化
+	cv::Mat eye_threshold = threshold_by_ptile(eye_img_gau, 0.4);
+	cv::rectangle(eye_threshold, cv::Point(0, 0), cv::Point(eye_threshold.size[1] - 1, eye_threshold.size[0] - 1), cv::Scalar(255, 255, 255), 1);
+
+	// 輪郭検出
+	// 出力先変数の宣言
+	std::vector<std::vector<cv::Point>> contours;
+	std::vector<cv::Vec4i> hierarchy;
+	// 検出
+	cv::findContours(eye_threshold, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+
+	// 虹彩の導出
+	IRIS _iris = { cv::Point2d(0, 0), .0 };
+	for (std::vector<cv::Point> v : contours) {
+		cv::Point2f center;
+		float radius;
+		cv::minEnclosingCircle(v, center, radius);
+
+		// 丸め込み
+		center = cv::Point2f((int)center.x, (int)center.y);
+		radius = (int)radius;
+
+		// あまりにも大きい半径は除外
+		if (eye_threshold.size[0] < radius * 0.8) continue;
+
+		// そのうえで半径が最大のものを虹彩とする
+		if (_iris.radius < radius) {
+			_iris.radius = radius;
+			_iris.center = center;
+		}
+	}
+	return _iris;
+}
+
+cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio) {
+	// implement: p_tile threshold
 }
