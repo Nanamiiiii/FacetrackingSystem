@@ -308,9 +308,9 @@ int main(void) {
 			// TODO: 眼球座標の算出
 			// 目領域の設定
 			EYE_REGION eye_left_region, eye_right_region;
-			eye_left_region.top = cv::Point2d(eye_left[0].x, eye_left[1].y < eye_left[2].y ? eye_left[2].y : eye_left[1].y);
+			eye_left_region.top = cv::Point2d(eye_left[0].x, eye_left[1].y < eye_left[2].y ? eye_left[1].y : eye_left[2].y);
 			eye_left_region.bottom = cv::Point2d(eye_left[3].x, eye_left[4].y < eye_left[5].y ? eye_left[5].y : eye_left[4].y);
-			eye_right_region.top = cv::Point2d(eye_right[0].x, eye_right[1].y < eye_right[2].y ? eye_right[2].y : eye_right[1].y);
+			eye_right_region.top = cv::Point2d(eye_right[0].x, eye_right[1].y < eye_right[2].y ? eye_right[1].y : eye_right[2].y);
 			eye_right_region.bottom = cv::Point2d(eye_right[3].x, eye_right[4].y < eye_right[5].y ? eye_right[5].y : eye_right[4].y);
 			
 			// 目領域の切り出し
@@ -493,11 +493,11 @@ cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio) {
 	
 	// ヒストグラム生成
 	cv::MatND img_hist;
-	// int histSize = { 256 };
-	// float range[] = { 0,256 };
-	// const float* histRange = { range };
+	int histSize = { 256 };
+	float range[] = { 0,256 };
+	const float* histRange = { range };
 
-	cv::calcHist({ img_gs }, { 0 }, cv::Mat(), img_hist, { 256 }, { {0, 256} });
+	cv::calcHist(&img_gs, 1, { 0 }, cv::Mat(), img_hist, 1, &histSize, &histRange);
 
 	// 画素数
 	int pixel = img_gs.size[0] * img_gs.size[1];
