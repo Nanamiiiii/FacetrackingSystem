@@ -46,7 +46,7 @@ typedef struct eye_region {
 
 // 虹彩
 typedef struct iris {
-	cv::Point2d center;
+	cv::Point2f center;
 	double radius;
 }IRIS;
 
@@ -305,7 +305,8 @@ int main(void) {
 			ear_left -= close_val;
 			ear_right -= close_val;
 
-			// TODO: 眼球座標の算出
+
+			// 眼球座標の算出
 			// 目領域の設定
 			EYE_REGION eye_left_region, eye_right_region;
 			eye_left_region.top = cv::Point2d(eye_left[0].x, eye_left[1].y < eye_left[2].y ? eye_left[1].y : eye_left[2].y);
@@ -314,6 +315,7 @@ int main(void) {
 			eye_right_region.bottom = cv::Point2d(eye_right[3].x, eye_right[4].y < eye_right[5].y ? eye_right[5].y : eye_right[4].y);
 			
 			// 目領域の切り出し
+			// TODO: 目領域が画像枠外の時の例外処理（範囲外の場合領域を切り取らない）
 			cv::Mat left_eye_img, right_eye_img;
 			left_eye_img = temp(cv::Rect(eye_left_region.top.x, eye_left_region.top.y, eye_left_region.bottom.x - eye_left_region.top.x, eye_left_region.bottom.y - eye_left_region.top.y));
 			right_eye_img = temp(cv::Rect(eye_right_region.top.x, eye_right_region.top.y, eye_right_region.bottom.x - eye_right_region.top.x, eye_right_region.bottom.y - eye_right_region.top.y));
@@ -324,8 +326,8 @@ int main(void) {
 			right_iris = detect_iris(right_eye_img);
 
 			// 画像上の絶対座標の算出
-			cv::Point2d left_center(int(left_iris.center.x + eye_left_region.top.x), int(left_iris.center.y + eye_left_region.top.y));
-			cv::Point2d right_center(int(right_iris.center.x + eye_right_region.top.x), int(right_iris.center.y + eye_right_region.top.y));
+			cv::Point2d left_center(left_iris.center.x + eye_left_region.top.x, left_iris.center.y + eye_left_region.top.y);
+			cv::Point2d right_center(right_iris.center.x + eye_right_region.top.x, right_iris.center.y + eye_right_region.top.y);
 
 			// 絶対座標を格納
 			left_iris.center = left_center;
@@ -354,6 +356,7 @@ int main(void) {
 			outtext << "Pos_Y: " << std::setprecision(3) << actor.v_pos;
 			cv::putText(temp, outtext.str(), cv::Point(50, 120), cv::FONT_HERSHEY_SIMPLEX, 0.75, cv::Scalar(255, 255, 255));
 			outtext.str("");
+
 
 
 			actor.yaw = euler_angle.at<double>(1);
@@ -455,9 +458,12 @@ IRIS detect_iris(cv::Mat eye_img) {
 	cv::Mat eye_img_gau;
 	cv::GaussianBlur(eye_img_gs, eye_img_gau, cv::Size(5, 5), 0);
 	
-	// Pタイル法での二値化
-	cv::Mat eye_threshold = threshold_by_ptile(eye_img_gau, 0.4);
-	cv::rectangle(eye_threshold, cv::Point(0, 0), cv::Point(eye_threshold.size[1] - 1, eye_threshold.size[0] - 1), cv::Scalar(255, 255, 255), 1);
+	// 二値化
+	// しきい値の60は最も安定したため用いた
+	int bin_th = 60;
+	cv::Mat eye_threshold;
+	cv::threshold(eye_img_gau, eye_threshold, bin_th, 255, cv::THRESH_BINARY);
+	cv::rectangle(eye_threshold, cv::Point(0, 0), cv::Point(eye_threshold.cols - 1, eye_threshold.rows - 1), cv::Scalar(255, 255, 255), 1);
 
 	// 輪郭検出
 	// 出力先変数の宣言
@@ -489,6 +495,16 @@ IRIS detect_iris(cv::Mat eye_img) {
 	return _iris;
 }
 
+
+
+// 上手くいかないのでpタイルは一旦廃止
+
+/// <summary>
+/// Pタイル法による二値化
+/// </summary>
+/// <param name="img_gs">グレースケールイメージ</param>
+/// <param name="ratio">二値化の割合</param>
+/// <returns>二値化処理後のイメージ</returns>
 cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio) {
 	
 	// ヒストグラム生成
@@ -500,11 +516,12 @@ cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio) {
 	cv::calcHist(&img_gs, 1, { 0 }, cv::Mat(), img_hist, 1, &histSize, &histRange);
 
 	// 画素数
-	int pixel = img_gs.size[0] * img_gs.size[1];
+	int pixel = img_gs.rows * img_gs.cols;
 	int threshold = pixel * ratio;
 
 	double rat_sum = 0;
 	int p_tile_th = 0;
+	
 	
 	for (int i = 0; i < 256; i++) {
 		double rat = img_hist.at<double>(i);
@@ -512,6 +529,7 @@ cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio) {
 		if (rat_sum > threshold) break;
 		p_tile_th++;
 	}
+	
 	
 	cv::Mat img_th;
 	cv::threshold(img_gs, img_th, p_tile_th, 255, cv::THRESH_BINARY);
