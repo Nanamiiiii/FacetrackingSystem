@@ -1,81 +1,11 @@
-﻿#define _ITERATOR_DEBUG_LEVEL 0
-#include <iostream>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <dlib/opencv.h>
-#include <dlib/image_processing/frontal_face_detector.h>
-#include <dlib/image_processing/render_face_detections.h>
-#include <dlib/image_processing.h>
-#include <dlib/serialize.h>
-#include <vector>
-#include <Windows.h>
-#include "CameraDetector.h"
-
-// フィルタ用係数
-#define LPF_VALUE_PRE 0.4
-#define LPF_VALUE_CUR (1 - LPF_VALUE_PRE)
-#define FACIAL_POINTS 68
-
-// 顔角度の最大値
-#define MAX_FACE_ANGLE 35
-
-
+﻿#include "FacetrackingSystem.h"
 
 // カメラ用パラメータ
 double K[9] = { 6.5308391993466671e+002, 0.0, 3.1950000000000000e+002, 0.0, 6.5308391993466671e+002, 2.3950000000000000e+002, 0.0, 0.0, 1.0 };
 double D[5] = { 7.0834633684407095e-002, 6.9140193737175351e-002, 0.0, 0.0, -1.3073460323689292e+000 };
 
-// 顔クラス
-class Face {
-public:
-	float h_pos;
-	float v_pos;
-	float yaw;
-	float pitch;
-	float roll;
-	float eye_L_X;
-	float eye_L_Y;
-};
-
-// 目領域
-typedef struct eye_region {
-	cv::Point2d top;
-	cv::Point2d bottom;
-}EYE_REGION;
-
-// 虹彩
-typedef struct iris {
-	cv::Point2d center;
-	double radius;
-}IRIS;
-
-// ローカル関数
-static void DrawFaceBox(cv::Mat frame, std::vector<cv::Point2d> reprojectdst); // 顔枠生成
-static void SetInitialPoints(std::vector<cv::Point3d>* in_BoxPoints, std::vector<cv::Point3d>* in_FaceLandmarkPoints); // 顔器官点の設定
-static double calc_dst(cv::Point2d a, cv::Point2d b);
-static IRIS detect_iris(cv::Mat eye_img);
-static cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio);
-
-// main関数
-int main(void) {
-	
-	// カメラデバイスの取得
-	int dev_id;
-	CameraDeviceDetect();
-
-	// 選択
-	std::cout << "Select device: ";
-	std::cin >> dev_id;
-
-	// カメラオープン
-	cv::VideoCapture cap(dev_id);
-	if (!cap.isOpened()) {
-
-		std::cout << "Unable to connect." << std::endl;
-		return EXIT_FAILURE;
-
-	}
+// main処理
+void Trackingsystem(cv::VideoCapture cap) {
 
 	// ソケット初期化（恐らく使わんのでコメントアウト）
 	/*
@@ -141,28 +71,6 @@ int main(void) {
 
 	// 画面出力
 	std::ostringstream outtext;
-
-	// Live2Dに必要なパラメタの抽出をここで
-	// 角度X : ParamAngleX
-	// 角度Y : ParamAngleY
-	// 角度Z : ParamAngleZ
-	// 左目開閉 : ParamEyeLOpen
-	// 右目開閉 : ParamEyeROpen
-	// 目玉X : ParamEyeBallX
-	// 目玉Y : ParamEyeBallY
-	std::vector<std::string> ParamIDs{
-		"ParamAngleX",
-		"ParamAngleY",
-		"ParamAngleZ",
-		"ParamEyeLOpen",
-		"ParamEyeROpen",
-		"ParamEyeBallX",
-		"ParamEyeBallY"
-	};
-
-	// pairを要素に持つvectorにパラメータを格納する
-	// pairの構成は < ParamID , Value >
-	std::vector< std::pair<const char*, double> > Live2D_Param;
 
 	// メイン処理
 	while (TRUE) {
@@ -305,7 +213,8 @@ int main(void) {
 			ear_left -= close_val;
 			ear_right -= close_val;
 
-			// TODO: 眼球座標の算出
+
+			// 眼球座標の算出
 			// 目領域の設定
 			EYE_REGION eye_left_region, eye_right_region;
 			eye_left_region.top = cv::Point2d(eye_left[0].x, eye_left[1].y < eye_left[2].y ? eye_left[1].y : eye_left[2].y);
@@ -314,6 +223,7 @@ int main(void) {
 			eye_right_region.bottom = cv::Point2d(eye_right[3].x, eye_right[4].y < eye_right[5].y ? eye_right[5].y : eye_right[4].y);
 			
 			// 目領域の切り出し
+			// TODO: 目領域が画像枠外の時の例外処理（範囲外の場合領域を切り取らない）
 			cv::Mat left_eye_img, right_eye_img;
 			left_eye_img = temp(cv::Rect(eye_left_region.top.x, eye_left_region.top.y, eye_left_region.bottom.x - eye_left_region.top.x, eye_left_region.bottom.y - eye_left_region.top.y));
 			right_eye_img = temp(cv::Rect(eye_right_region.top.x, eye_right_region.top.y, eye_right_region.bottom.x - eye_right_region.top.x, eye_right_region.bottom.y - eye_right_region.top.y));
@@ -324,8 +234,8 @@ int main(void) {
 			right_iris = detect_iris(right_eye_img);
 
 			// 画像上の絶対座標の算出
-			cv::Point2d left_center(int(left_iris.center.x + eye_left_region.top.x), int(left_iris.center.y + eye_left_region.top.y));
-			cv::Point2d right_center(int(right_iris.center.x + eye_right_region.top.x), int(right_iris.center.y + eye_right_region.top.y));
+			cv::Point2d left_center(left_iris.center.x + eye_left_region.top.x, left_iris.center.y + eye_left_region.top.y);
+			cv::Point2d right_center(right_iris.center.x + eye_right_region.top.x, right_iris.center.y + eye_right_region.top.y);
 
 			// 絶対座標を格納
 			left_iris.center = left_center;
@@ -355,22 +265,9 @@ int main(void) {
 			cv::putText(temp, outtext.str(), cv::Point(50, 120), cv::FONT_HERSHEY_SIMPLEX, 0.75, cv::Scalar(255, 255, 255));
 			outtext.str("");
 
-
 			actor.yaw = euler_angle.at<double>(1);
 			actor.pitch = euler_angle.at<double>(0);
 			actor.roll = euler_angle.at<double>(2);
-
-
-			/*
-			// Live2D用パラメータを作成
-			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[0].c_str(), euler_angle.at<double>(0)));
-			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[1].c_str(), euler_angle.at<double>(1)));
-			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[2].c_str(), euler_angle.at<double>(2)));
-			// TODO : Eye関係paramの実装
-			Live2D_Param.push_back(std::pair<const char*, double>(ParamIDs[3].c_str(), ear_left));
-			Live2D_Param.push_back(std::pair<const char*, double>(ParamIDs[4].c_str(), ear_right));
-			*/
-
 
 			image_pts.clear();
 			//press esc to end
@@ -387,7 +284,7 @@ int main(void) {
 		cv::imshow("FaceTrack", temp);
 		cv::waitKey(1);
 	}
-	return 0;
+	return;
 }
 
 void DrawFaceBox(cv::Mat frame, std::vector<cv::Point2d> reprojectdst)
@@ -455,9 +352,12 @@ IRIS detect_iris(cv::Mat eye_img) {
 	cv::Mat eye_img_gau;
 	cv::GaussianBlur(eye_img_gs, eye_img_gau, cv::Size(5, 5), 0);
 	
-	// Pタイル法での二値化
-	cv::Mat eye_threshold = threshold_by_ptile(eye_img_gau, 0.4);
-	cv::rectangle(eye_threshold, cv::Point(0, 0), cv::Point(eye_threshold.size[1] - 1, eye_threshold.size[0] - 1), cv::Scalar(255, 255, 255), 1);
+	// 二値化
+	// しきい値の60は最も安定したため用いた
+	int bin_th = 60;
+	cv::Mat eye_threshold;
+	cv::threshold(eye_img_gau, eye_threshold, bin_th, 255, cv::THRESH_BINARY);
+	cv::rectangle(eye_threshold, cv::Point(0, 0), cv::Point(eye_threshold.cols - 1, eye_threshold.rows - 1), cv::Scalar(255, 255, 255), 1);
 
 	// 輪郭検出
 	// 出力先変数の宣言
@@ -489,6 +389,16 @@ IRIS detect_iris(cv::Mat eye_img) {
 	return _iris;
 }
 
+
+
+// 上手くいかないのでpタイルは一旦廃止
+
+/// <summary>
+/// Pタイル法による二値化
+/// </summary>
+/// <param name="img_gs">グレースケールイメージ</param>
+/// <param name="ratio">二値化の割合</param>
+/// <returns>二値化処理後のイメージ</returns>
 cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio) {
 	
 	// ヒストグラム生成
@@ -500,11 +410,12 @@ cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio) {
 	cv::calcHist(&img_gs, 1, { 0 }, cv::Mat(), img_hist, 1, &histSize, &histRange);
 
 	// 画素数
-	int pixel = img_gs.size[0] * img_gs.size[1];
+	int pixel = img_gs.rows * img_gs.cols;
 	int threshold = pixel * ratio;
 
 	double rat_sum = 0;
 	int p_tile_th = 0;
+	
 	
 	for (int i = 0; i < 256; i++) {
 		double rat = img_hist.at<double>(i);
@@ -512,6 +423,7 @@ cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio) {
 		if (rat_sum > threshold) break;
 		p_tile_th++;
 	}
+	
 	
 	cv::Mat img_th;
 	cv::threshold(img_gs, img_th, p_tile_th, 255, cv::THRESH_BINARY);

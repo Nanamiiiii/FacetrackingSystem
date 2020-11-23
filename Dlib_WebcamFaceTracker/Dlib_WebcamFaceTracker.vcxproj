@@ -155,10 +155,12 @@
   <ItemGroup>
     <ClCompile Include="CameraDetector.cpp" />
     <ClCompile Include="D:\lib\dnn\dlib-19.21\dlib\all\source.cpp" />
-    <ClCompile Include="Dlib_WebcamFaceTracker.cpp" />
+    <ClCompile Include="FacetrackingSystem.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CameraDetector.h" />
+    <ClInclude Include="FacetrackingSystem.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
