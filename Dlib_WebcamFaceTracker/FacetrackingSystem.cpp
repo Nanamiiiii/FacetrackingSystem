@@ -5,7 +5,7 @@ double K[9] = { 6.5308391993466671e+002, 0.0, 3.1950000000000000e+002, 0.0, 6.53
 double D[5] = { 7.0834633684407095e-002, 6.9140193737175351e-002, 0.0, 0.0, -1.3073460323689292e+000 };
 
 // main処理
-void Trackingsystem(cv::VideoCapture cap) {
+void Trackingsystem(cv::VideoCapture cap, FACE_PARAM out_param) {
 
 	// ソケット初期化（恐らく使わんのでコメントアウト）
 	/*
@@ -174,8 +174,8 @@ void Trackingsystem(cv::VideoCapture cap) {
 			// 顔の角度制限(Live2Dが30まで対応なのでそれに制限)
 			for (int i = 0; i < 3; i++)
 			{
-				if (euler_angle.at<double>(i) > 30) euler_angle.at<double>(i) = 30;
-				if (euler_angle.at<double>(i) < -30) euler_angle.at<double>(i) = -30;
+				if (euler_angle.at<double>(i) > MAX_FACE_ANGLE) euler_angle.at<double>(i) = MAX_FACE_ANGLE;
+				if (euler_angle.at<double>(i) < -MAX_FACE_ANGLE) euler_angle.at<double>(i) = -MAX_FACE_ANGLE;
 				if ((std::abs(prev_euler_angle.at<double>(i) - euler_angle.at<double>(i)) > 1))
 				{
 					if (prev_euler_angle.at<double>(i) > euler_angle.at<double>(i))
@@ -186,8 +186,7 @@ void Trackingsystem(cv::VideoCapture cap) {
 					{
 						euler_angle.at<double>(i) += 0.005;
 					}
-					euler_angle.at<double>(i) = (LPF_VALUE_PRE * prev_euler_angle.at<double>(i))
-						+ (LPF_VALUE_CUR * euler_angle.at<double>(i));
+					euler_angle.at<double>(i) = (LPF_VALUE_PRE * prev_euler_angle.at<double>(i)) + (LPF_VALUE_CUR * euler_angle.at<double>(i));
 				}
 				else
 				{
@@ -202,48 +201,56 @@ void Trackingsystem(cv::VideoCapture cap) {
 			// 目の開閉の判定処理
 			double ear_left = (calc_dst(eye_left[1], eye_left[5]) + calc_dst(eye_left[2], eye_left[4])) / (2.0 * calc_dst(eye_left[0], eye_left[3]));
 			double ear_right = (calc_dst(eye_right[1], eye_right[5]) + calc_dst(eye_right[2], eye_right[4])) / (2.0 * calc_dst(eye_right[0], eye_right[3]));
-			double close_val = 0.2; // 閉じている判定のしきい値
+			double close_val = 0.15; // 閉じている判定のしきい値
 			double open_val = 0.3; // 開きの最大判定値 (後々初期値設定側で導入)
 
 			// しきい値で値を0~1に収める
-			if (ear_left > open_val) ear_left = open_val;
-			if (ear_right > open_val) ear_right = open_val;
-			if (ear_left < close_val) ear_left = close_val;
-			if (ear_right < close_val) ear_right = close_val;
-			ear_left -= close_val;
-			ear_right -= close_val;
+			ear_left /= open_val;
+			ear_right /= open_val;
+			if (ear_left <= close_val / open_val) ear_left = 0;
+			if (ear_right <= close_val / open_val) ear_right = 0;
 
 
 			// 眼球座標の算出
 			// 目領域の設定
 			EYE_REGION eye_left_region, eye_right_region;
-			eye_left_region.top = cv::Point2d(eye_left[0].x, eye_left[1].y < eye_left[2].y ? eye_left[1].y : eye_left[2].y);
-			eye_left_region.bottom = cv::Point2d(eye_left[3].x, eye_left[4].y < eye_left[5].y ? eye_left[5].y : eye_left[4].y);
-			eye_right_region.top = cv::Point2d(eye_right[0].x, eye_right[1].y < eye_right[2].y ? eye_right[1].y : eye_right[2].y);
-			eye_right_region.bottom = cv::Point2d(eye_right[3].x, eye_right[4].y < eye_right[5].y ? eye_right[5].y : eye_right[4].y);
-			
-			// 目領域の切り出し
-			// TODO: 目領域が画像枠外の時の例外処理（範囲外の場合領域を切り取らない）
 			cv::Mat left_eye_img, right_eye_img;
-			left_eye_img = temp(cv::Rect(eye_left_region.top.x, eye_left_region.top.y, eye_left_region.bottom.x - eye_left_region.top.x, eye_left_region.bottom.y - eye_left_region.top.y));
-			right_eye_img = temp(cv::Rect(eye_right_region.top.x, eye_right_region.top.y, eye_right_region.bottom.x - eye_right_region.top.x, eye_right_region.bottom.y - eye_right_region.top.y));
-			
-			// 虹彩の検出
 			IRIS left_iris, right_iris;
-			left_iris = detect_iris(left_eye_img);
-			right_iris = detect_iris(right_eye_img);
 
-			// 画像上の絶対座標の算出
+			if (ear_left > 0) {
+				eye_left_region.top = cv::Point2d(eye_left[0].x, eye_left[1].y < eye_left[2].y ? eye_left[1].y : eye_left[2].y);
+				eye_left_region.bottom = cv::Point2d(eye_left[3].x, eye_left[4].y < eye_left[5].y ? eye_left[5].y : eye_left[4].y);
+				left_eye_img = temp(cv::Rect(eye_left_region.top.x, eye_left_region.top.y, eye_left_region.bottom.x - eye_left_region.top.x, eye_left_region.bottom.y - eye_left_region.top.y));
+				left_iris = detect_iris(left_eye_img);
+			}
+			else {
+				left_iris.center = cv::Point2f(0, 0);
+				left_iris.radius = 0;
+			}
+
+			if (ear_right > 0) {
+				eye_right_region.top = cv::Point2d(eye_right[0].x, eye_right[1].y < eye_right[2].y ? eye_right[1].y : eye_right[2].y);
+				eye_right_region.bottom = cv::Point2d(eye_right[3].x, eye_right[4].y < eye_right[5].y ? eye_right[5].y : eye_right[4].y);
+				right_eye_img = temp(cv::Rect(eye_right_region.top.x, eye_right_region.top.y, eye_right_region.bottom.x - eye_right_region.top.x, eye_right_region.bottom.y - eye_right_region.top.y));
+				right_iris = detect_iris(right_eye_img);
+			}
+			else {
+				right_iris.center = cv::Point2f(0, 0);
+				right_iris.radius = 0;
+			}
+			
 			cv::Point2d left_center(left_iris.center.x + eye_left_region.top.x, left_iris.center.y + eye_left_region.top.y);
 			cv::Point2d right_center(right_iris.center.x + eye_right_region.top.x, right_iris.center.y + eye_right_region.top.y);
 
 			// 絶対座標を格納
-			left_iris.center = left_center;
-			right_iris.center = right_center;
+			IRIS left_iris_gl = cp_iris(left_iris);
+			IRIS right_iris_gl = cp_iris(right_iris);
 
-			cv::circle(temp, left_iris.center, left_iris.radius, cv::Scalar(0, 255, 0), 1);
-			cv::circle(temp, right_iris.center, right_iris.radius, cv::Scalar(0, 255, 0), 1);
+			left_iris_gl.center = left_center;
+			right_iris_gl.center = right_center;
 
+			cv::circle(temp, left_iris_gl.center, left_iris_gl.radius, cv::Scalar(0, 255, 0), 1);
+			cv::circle(temp, right_iris_gl.center, right_iris_gl.radius, cv::Scalar(0, 255, 0), 1);
 
 			// 画面表示：顔角度
 			outtext << "X: " << std::setprecision(3) << euler_angle.at<double>(0);
@@ -269,6 +276,11 @@ void Trackingsystem(cv::VideoCapture cap) {
 			actor.pitch = euler_angle.at<double>(0);
 			actor.roll = euler_angle.at<double>(2);
 
+			// 共有用
+			out_param._face = actor;
+			out_param.left_iris = left_iris;
+			out_param.right_iris = right_iris;
+
 			image_pts.clear();
 			//press esc to end
 			//escで終了
@@ -287,8 +299,8 @@ void Trackingsystem(cv::VideoCapture cap) {
 	return;
 }
 
-void DrawFaceBox(cv::Mat frame, std::vector<cv::Point2d> reprojectdst)
-{
+void DrawFaceBox(cv::Mat frame, std::vector<cv::Point2d> reprojectdst) {
+
 	cv::line(frame, reprojectdst[8], reprojectdst[9], cv::Scalar(0, 0, 255));
 	cv::line(frame, reprojectdst[9], reprojectdst[10], cv::Scalar(0, 0, 255));
 	cv::line(frame, reprojectdst[10], reprojectdst[11], cv::Scalar(0, 0, 255));
@@ -298,8 +310,8 @@ void DrawFaceBox(cv::Mat frame, std::vector<cv::Point2d> reprojectdst)
 	cv::line(frame, reprojectdst[9], reprojectdst[11], cv::Scalar(0, 0, 255));
 }
 
-void SetInitialPoints(std::vector<cv::Point3d>* in_BoxPoints, std::vector<cv::Point3d>* in_FaceLandmarkPoints)
-{
+void SetInitialPoints(std::vector<cv::Point3d>* in_BoxPoints, std::vector<cv::Point3d>* in_FaceLandmarkPoints) {
+
 	std::vector<cv::Point3d> reprojectsrc = (std::vector<cv::Point3d>) * in_BoxPoints;
 	std::vector<cv::Point3d> object_pts = (std::vector<cv::Point3d>) * in_FaceLandmarkPoints;
 
@@ -347,6 +359,7 @@ double calc_dst(cv::Point2d a, cv::Point2d b) {
 /// <param name="eye_img">cv::Mat 目の画像</param>
 /// <returns>struct IRIS 検出した虹彩</returns>
 IRIS detect_iris(cv::Mat eye_img) {
+
 	cv::Mat eye_img_gs; 
 	cv::cvtColor(eye_img, eye_img_gs, cv::COLOR_BGR2GRAY);
 	cv::Mat eye_img_gau;
@@ -429,4 +442,13 @@ cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio) {
 	cv::threshold(img_gs, img_th, p_tile_th, 255, cv::THRESH_BINARY);
 
 	return img_th;
+}
+
+IRIS cp_iris(IRIS _iris) {
+
+	IRIS ret;
+	ret.center = cv::Point2f(_iris.center.x, _iris.center.y);
+	ret.radius = _iris.radius;
+
+	return ret;
 }

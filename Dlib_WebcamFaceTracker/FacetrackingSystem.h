@@ -17,11 +17,7 @@
 #define FACIAL_POINTS 68
 
 // 顔角度の最大値
-#define MAX_FACE_ANGLE 35
-
-
-
-
+#define MAX_FACE_ANGLE 30
 
 // 顔クラス
 class Face {
@@ -31,8 +27,6 @@ public:
 	float yaw;
 	float pitch;
 	float roll;
-	float eye_L_X;
-	float eye_L_Y;
 };
 
 // 目領域
@@ -47,10 +41,18 @@ typedef struct iris {
 	double radius;
 }IRIS;
 
+// 共有用パラメータ
+typedef struct face_param {
+	Face _face;
+	IRIS left_iris;
+	IRIS right_iris;
+}FACE_PARAM;
+
 // ローカル関数
-void Trackingsystem(cv::VideoCapture cap);
+void Trackingsystem(cv::VideoCapture cap, FACE_PARAM out_param);
 static void DrawFaceBox(cv::Mat frame, std::vector<cv::Point2d> reprojectdst); // 顔枠生成
 static void SetInitialPoints(std::vector<cv::Point3d>* in_BoxPoints, std::vector<cv::Point3d>* in_FaceLandmarkPoints); // 顔器官点の設定
 static double calc_dst(cv::Point2d a, cv::Point2d b);
 static IRIS detect_iris(cv::Mat eye_img);
 static cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio);
+static IRIS cp_iris(IRIS _iris);

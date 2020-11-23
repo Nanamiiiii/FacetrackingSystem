@@ -19,7 +19,8 @@ int main(void) {
 
 	}
 
-	Trackingsystem(cap);
+	FACE_PARAM face_p;
+	Trackingsystem(cap, face_p);
 
 	return 0;
 }
