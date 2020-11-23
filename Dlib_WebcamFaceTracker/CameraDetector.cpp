@@ -2,6 +2,7 @@
 #include "CameraDetector.h"
 #include <iostream>
 #include <dshow.h>
+#include <winerror.h>
 
 int CameraDeviceDetect(void) {
 
@@ -13,10 +14,10 @@ int CameraDeviceDetect(void) {
 	ULONG nFetched = 0;
 
 	// COM initialization
-	CoInitialize(NULL);
+	if(FAILED(CoInitialize(NULL))) return -1;
 
 	// デバイス列挙用のCreateDevEnum生成
-	CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER, IID_ICreateDevEnum, (PVOID*)&pCreateDevEnum);
+	if(FAILED(CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER, IID_ICreateDevEnum, (PVOID*)&pCreateDevEnum))) return -1;
 
 	// 列挙用EnumMoniker生成
 	pCreateDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pEnumMoniker, 0);
@@ -24,7 +25,7 @@ int CameraDeviceDetect(void) {
 	// デバイスがない場合
 	if (pEnumMoniker == NULL) {
 		std::cout << "No device detected." << std::endl;
-		return 0;
+		return -1;
 	}
 
 	// Enumシーケンスを先頭に戻す

@@ -1,81 +1,11 @@
-﻿#define _ITERATOR_DEBUG_LEVEL 0
-#include <iostream>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <dlib/opencv.h>
-#include <dlib/image_processing/frontal_face_detector.h>
-#include <dlib/image_processing/render_face_detections.h>
-#include <dlib/image_processing.h>
-#include <dlib/serialize.h>
-#include <vector>
-#include <Windows.h>
-#include "CameraDetector.h"
-
-// フィルタ用係数
-#define LPF_VALUE_PRE 0.4
-#define LPF_VALUE_CUR (1 - LPF_VALUE_PRE)
-#define FACIAL_POINTS 68
-
-// 顔角度の最大値
-#define MAX_FACE_ANGLE 35
-
-
+﻿#include "FacetrackingSystem.h"
 
 // カメラ用パラメータ
 double K[9] = { 6.5308391993466671e+002, 0.0, 3.1950000000000000e+002, 0.0, 6.5308391993466671e+002, 2.3950000000000000e+002, 0.0, 0.0, 1.0 };
 double D[5] = { 7.0834633684407095e-002, 6.9140193737175351e-002, 0.0, 0.0, -1.3073460323689292e+000 };
 
-// 顔クラス
-class Face {
-public:
-	float h_pos;
-	float v_pos;
-	float yaw;
-	float pitch;
-	float roll;
-	float eye_L_X;
-	float eye_L_Y;
-};
-
-// 目領域
-typedef struct eye_region {
-	cv::Point2d top;
-	cv::Point2d bottom;
-}EYE_REGION;
-
-// 虹彩
-typedef struct iris {
-	cv::Point2f center;
-	double radius;
-}IRIS;
-
-// ローカル関数
-static void DrawFaceBox(cv::Mat frame, std::vector<cv::Point2d> reprojectdst); // 顔枠生成
-static void SetInitialPoints(std::vector<cv::Point3d>* in_BoxPoints, std::vector<cv::Point3d>* in_FaceLandmarkPoints); // 顔器官点の設定
-static double calc_dst(cv::Point2d a, cv::Point2d b);
-static IRIS detect_iris(cv::Mat eye_img);
-static cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio);
-
-// main関数
-int main(void) {
-	
-	// カメラデバイスの取得
-	int dev_id;
-	CameraDeviceDetect();
-
-	// 選択
-	std::cout << "Select device: ";
-	std::cin >> dev_id;
-
-	// カメラオープン
-	cv::VideoCapture cap(dev_id);
-	if (!cap.isOpened()) {
-
-		std::cout << "Unable to connect." << std::endl;
-		return EXIT_FAILURE;
-
-	}
+// main処理
+void Trackingsystem(cv::VideoCapture cap) {
 
 	// ソケット初期化（恐らく使わんのでコメントアウト）
 	/*
@@ -141,28 +71,6 @@ int main(void) {
 
 	// 画面出力
 	std::ostringstream outtext;
-
-	// Live2Dに必要なパラメタの抽出をここで
-	// 角度X : ParamAngleX
-	// 角度Y : ParamAngleY
-	// 角度Z : ParamAngleZ
-	// 左目開閉 : ParamEyeLOpen
-	// 右目開閉 : ParamEyeROpen
-	// 目玉X : ParamEyeBallX
-	// 目玉Y : ParamEyeBallY
-	std::vector<std::string> ParamIDs{
-		"ParamAngleX",
-		"ParamAngleY",
-		"ParamAngleZ",
-		"ParamEyeLOpen",
-		"ParamEyeROpen",
-		"ParamEyeBallX",
-		"ParamEyeBallY"
-	};
-
-	// pairを要素に持つvectorにパラメータを格納する
-	// pairの構成は < ParamID , Value >
-	std::vector< std::pair<const char*, double> > Live2D_Param;
 
 	// メイン処理
 	while (TRUE) {
@@ -357,23 +265,9 @@ int main(void) {
 			cv::putText(temp, outtext.str(), cv::Point(50, 120), cv::FONT_HERSHEY_SIMPLEX, 0.75, cv::Scalar(255, 255, 255));
 			outtext.str("");
 
-
-
 			actor.yaw = euler_angle.at<double>(1);
 			actor.pitch = euler_angle.at<double>(0);
 			actor.roll = euler_angle.at<double>(2);
-
-
-			/*
-			// Live2D用パラメータを作成
-			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[0].c_str(), euler_angle.at<double>(0)));
-			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[1].c_str(), euler_angle.at<double>(1)));
-			Live2D_Param.push_back(std::pair<const char*, double> (ParamIDs[2].c_str(), euler_angle.at<double>(2)));
-			// TODO : Eye関係paramの実装
-			Live2D_Param.push_back(std::pair<const char*, double>(ParamIDs[3].c_str(), ear_left));
-			Live2D_Param.push_back(std::pair<const char*, double>(ParamIDs[4].c_str(), ear_right));
-			*/
-
 
 			image_pts.clear();
 			//press esc to end
@@ -390,7 +284,7 @@ int main(void) {
 		cv::imshow("FaceTrack", temp);
 		cv::waitKey(1);
 	}
-	return 0;
+	return;
 }
 
 void DrawFaceBox(cv::Mat frame, std::vector<cv::Point2d> reprojectdst)
