@@ -49,7 +49,7 @@ typedef struct face_param {
 }FACE_PARAM;
 
 // ƒ[ƒJƒ‹ŠÖ”
-void Trackingsystem(cv::VideoCapture cap, FACE_PARAM out_param);
+void Trackingsystem(cv::VideoCapture cap, FACE_PARAM out_param, boolean window_gen);
 static void DrawFaceBox(cv::Mat frame, std::vector<cv::Point2d> reprojectdst); // Šç˜g¶¬
 static void SetInitialPoints(std::vector<cv::Point3d>* in_BoxPoints, std::vector<cv::Point3d>* in_FaceLandmarkPoints); // ŠçŠíŠ¯“_‚Ìİ’è
 static double calc_dst(cv::Point2d a, cv::Point2d b);

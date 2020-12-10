@@ -5,22 +5,7 @@ double K[9] = { 6.5308391993466671e+002, 0.0, 3.1950000000000000e+002, 0.0, 6.53
 double D[5] = { 7.0834633684407095e-002, 6.9140193737175351e-002, 0.0, 0.0, -1.3073460323689292e+000 };
 
 // main処理
-void Trackingsystem(cv::VideoCapture cap, FACE_PARAM out_param) {
-
-	// ソケット初期化（恐らく使わんのでコメントアウト）
-	/*
-	int sock;
-	WSAData wsaData;
-	struct sockaddr_in addr;
-	WSAStartup(MAKEWORD(2, 0), &wsaData);
-	sock = socket(AF_INET, SOCK_DGRAM, 0);
-
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(22222);
-	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-	sendto(sock, "HELLO", 5, 0, (struct sockaddr*)&addr, sizeof(addr));
-	*/
+void Trackingsystem(cv::VideoCapture cap, FACE_PARAM out_param, boolean window_gen) {
 
 	/********** 検出器初期化 ************/
 	// 顔検出器
@@ -72,7 +57,7 @@ void Trackingsystem(cv::VideoCapture cap, FACE_PARAM out_param) {
 	// 画面出力
 	std::ostringstream outtext;
 
-	// メイン処理
+	// メインのループ処理
 	while (TRUE) {
 
 		// カメラから画像フレームを取得
@@ -293,7 +278,7 @@ void Trackingsystem(cv::VideoCapture cap, FACE_PARAM out_param) {
 		Sleep(1 / 1000);
 
 		// カメラ映像出力
-		cv::imshow("FaceTrack", temp);
+		if(window_gen) cv::imshow("FaceTrack", temp);
 		cv::waitKey(1);
 	}
 	return;
@@ -420,7 +405,7 @@ cv::Mat threshold_by_ptile(cv::Mat img_gs, double ratio) {
 	float range[] = { 0,256 };
 	const float* histRange = { range };
 
-	cv::calcHist(&img_gs, 1, { 0 }, cv::Mat(), img_hist, 1, &histSize, &histRange);
+	cv::calcHist(&img_gs, 1, 0, cv::Mat(), img_hist, 1, &histSize, &histRange);
 
 	// 画素数
 	int pixel = img_gs.rows * img_gs.cols;

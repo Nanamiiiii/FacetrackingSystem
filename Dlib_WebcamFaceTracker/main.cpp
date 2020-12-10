@@ -20,7 +20,7 @@ int main(void) {
 	}
 
 	FACE_PARAM face_p;
-	Trackingsystem(cap, face_p);
+	Trackingsystem(cap, face_p, TRUE);
 
 	return 0;
 }
